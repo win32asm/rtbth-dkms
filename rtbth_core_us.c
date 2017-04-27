@@ -755,6 +755,7 @@ static int rtbth_us_close(struct inode *inode, struct file *file){
 ssize_t rtbth_us_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos){
 
     ssize_t retval = 0;
+    int len;
     RTBTH_EVENT_T evt = 0;
     int wait_ret = 0;
 
@@ -765,7 +766,10 @@ ssize_t rtbth_us_read(struct file *filp, char __user *buf, size_t count, loff_t 
 
     while(1){
             if(kfifo_len(gpAd->evt_fifo) > 0){
-                kfifo_out(gpAd->evt_fifo, &evt, sizeof(RTBTH_EVENT_T));
+                len = kfifo_out(gpAd->evt_fifo, &evt, sizeof(RTBTH_EVENT_T));
+                if (unlikely(len != sizeof(RTBTH_EVENT_T))) {
+                    DebugPrint(WARNING, DBG_INIT,"%s: unexpected fifo out len = %d\n", __func__, len);
+                }
                 DebugPrint(TRACE, DBG_INIT,"%s: event fifo len = %d\n", __func__, kfifo_len(gpAd->evt_fifo));
                 break;
             } else {
@@ -814,6 +818,7 @@ out:
 ssize_t rtbth_us_read(struct file *filp, char __user *buf, size_t count, loff_t *f_pos){
 
     ssize_t retval = 0;
+    int len;
     RTBTH_EVENT_T evt = 0;
     int wait_ret = 0;
 static int entries = 0;
@@ -826,7 +831,10 @@ static int out=0;
 
     while(1){
         if(kfifo_len(gpAd->evt_fifo) > 0){
-            kfifo_out(gpAd->evt_fifo, &evt, sizeof(RTBTH_EVENT_T));
+            len = kfifo_out(gpAd->evt_fifo, &evt, sizeof(RTBTH_EVENT_T));
+            if (unlikely(len != sizeof(RTBTH_EVENT_T))) {
+                DebugPrint(WARNING, DBG_INIT,"%s: unexpected fifo out len = %d\n", __func__, len);
+            }
             DebugPrint(TRACE, DBG_INIT,"%s: remaining event fifo len = %d, out=%d\n", __func__, kfifo_len(gpAd->evt_fifo), ++out);
             break;
         } else {
@@ -1238,6 +1246,7 @@ long    rtbth_us_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned lo
     int retval = 0;
     static unsigned char  buf[2048];
     int type =0;
+    int fifo_len;
   unsigned short len = 0;
     struct kfifo  *fifo;
     spinlock_t  *fifo_sp;
@@ -1565,21 +1574,30 @@ long    rtbth_us_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned lo
 
                 DebugPrint(TRACE, DBG_INIT,"bz type = %d, len of fifo = %d, len of buf = %d\n",bzread.type, kfifo_len(fifo), bzread.len_buf);
                 if(kfifo_len(fifo) >= sz_need) {
-                    kfifo_out(fifo, &chk[0] , sizeof(chk));
+                    fifo_len = kfifo_out(fifo, &chk[0] , sizeof(chk));
+                    if (unlikely(fifo_len != sizeof(chk))) {
+                        DebugPrint(WARNING, DBG_INIT,"%s:%d: unexpected fifo out hdr len = %d\n", __func__, __LINE__, fifo_len);
+                    }
                     if(chk[0]!=0xcc && chk[1]!=0xcc){
                         DebugPrint(ERROR, DBG_INIT,"@@@@read bz data err: delimeter parsing fail, chk[0]=0x%02x, chk[1]=0x%02x\n", chk[0], chk[1]);
                         retval = -EFAULT;
                         spin_unlock_irqrestore(fifo_sp,cpuflags);
                         break;
                     }
-                    kfifo_out(fifo, &len, sizeof(unsigned long));
+                    fifo_len = kfifo_out(fifo, &len, sizeof(unsigned long));
+                    if (unlikely(fifo_len != sizeof(unsigned long))) {
+                        DebugPrint(WARNING, DBG_INIT,"%s:%d: unexpected fifo out length len = %d\n", __func__, __LINE__, fifo_len);
+                    }
                     if(len > 2048 || len < 1){
                         DebugPrint(ERROR, DBG_INIT,"@@@@read bz data err: len invalid (%d)\n", len);
                         retval = -EFAULT;
                         spin_unlock_irqrestore(fifo_sp,cpuflags);
                         break;
                     }
-                    kfifo_out(fifo, buf, len);
+                    fifo_len = kfifo_out(fifo, buf, len);
+                    if (unlikely(fifo_len != len)) {
+                        DebugPrint(WARNING, DBG_INIT,"%s:%d: unexpected fifo out data len = %d\n", __func__, __LINE__, fifo_len);
+                    }
                 } else {
                     DebugPrint(ERROR, DBG_INIT,"@@@@read bz data err: data not available, kfifo_len (%d), sz_need = %d\n", kfifo_len(fifo), sz_need);
                     retval = -EFAULT;
@@ -1722,15 +1740,24 @@ long    rtbth_us_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned lo
 
                 spin_lock_irqsave(fifo_sp,cpuflags);
                 //if(kfifo_len(fifo) >= sz_need) {
-                    kfifo_out(fifo, &chk[0] , sizeof(chk));
+                    fifo_len = kfifo_out(fifo, &chk[0] , sizeof(chk));
+                    if (unlikely(fifo_len != sizeof(chk))) {
+                        DebugPrint(WARNING, DBG_INIT,"%s:%d: unexpected fifo out hdr len = %d\n", __func__, __LINE__, fifo_len);
+                    }
                     if(chk[0]!=0xcc && chk[1]!=0xcc){
                         DebugPrint(ERROR, DBG_INIT,"@@@@rx packet: delimeter parsing fail, chk[0]=0x%02x, chk[1]=0x%02x\n", chk[0], chk[1]);
                         retval = -EFAULT;
                         spin_unlock_irqrestore(fifo_sp,cpuflags);
                         break;
                     }
-                    kfifo_out(fifo, &rxbi, sizeof(rxbi));
-                    kfifo_out(fifo, &pkt_len, sizeof(pkt_len));
+                    fifo_len = kfifo_out(fifo, &rxbi, sizeof(rxbi));
+                    if (unlikely(fifo_len != sizeof(rxbi))) {
+                        DebugPrint(WARNING, DBG_INIT,"%s:%d: unexpected fifo out hdr2 len = %d\n", __func__, __LINE__, fifo_len);
+                    }
+                    fifo_len = kfifo_out(fifo, &pkt_len, sizeof(pkt_len));
+                    if (unlikely(fifo_len != sizeof(pkt_len))) {
+                        DebugPrint(WARNING, DBG_INIT,"%s: unexpected fifo out length len = %d\n", __func__, __LINE__, fifo_len);
+                    }
                    // if(pkt_len > 2048 || pkt_len < sz_need){
                     if(pkt_len > 2048){
                         DebugPrint(ERROR, DBG_INIT,"@@@@rx packet err: len invalid (%d)\n", pkt_len);
@@ -1738,7 +1765,10 @@ long    rtbth_us_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned lo
                         spin_unlock_irqrestore(fifo_sp,cpuflags);
                         break;
                     }
-                    kfifo_out(fifo, buf, pkt_len);
+                    fifo_len = kfifo_out(fifo, buf, pkt_len);
+                    if (unlikely(fifo_len != pkt_len)) {
+                        DebugPrint(WARNING, DBG_INIT,"%s: unexpected fifo out data len = %d\n", __func__, __LINE__, fifo_len);
+                    }
                 //} else {
                 //    DebugPrint(ERROR, DBG_INIT,"@@@@read rx err: data not available, kfifo_len (%d),  sizeof(RXBI_STRUC)=%d, sizeof(unsigned int)=%d\n",
                 //        kfifo_len(fifo),sizeof(RXBI_STRUC),sizeof(unsigned int)  );
