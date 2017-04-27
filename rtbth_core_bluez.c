@@ -31,7 +31,7 @@
 
 void *g_hdev = 0;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,13,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,13,0) || ( defined (RHEL_RELEASE_CODE) && (RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(7,3)))
 int rtbt_hci_dev_ioctl(struct hci_dev *hdev, unsigned int cmd, unsigned long arg)
 {
     BT_WARN("%s(dev=0x%lx): ioctl cmd=0x%x", __FUNCTION__, (ULONG)hdev, cmd);
@@ -56,7 +56,7 @@ int rtbt_hci_dev_flush(struct hci_dev *hdev)
 //static const char *pkt_type_str[]= {"UNKNOWN", "HCI_CMD", "ACL_DATA",
 //    "SCO_DATA", "HCI_EVENT", "HCI_VENDOR", "ERROR_TYPE"};
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,13,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,13,0) || ( defined (RHEL_RELEASE_CODE) && (RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(7,3)))
 int rtbt_hci_dev_send(struct hci_dev *hdev, struct sk_buff *skb)
 {
 #else
@@ -106,7 +106,7 @@ int rtbt_hci_dev_send(struct sk_buff *skb)
             break;
         case HCI_SCODATA_PKT:
             BT_WARN("%s(): sco len=%d,time=0x%lx", __FUNCTION__, skb->len, jiffies);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,0,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,0,0) || ( defined (RHEL_RELEASE_CODE) && (RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(7,3)))
             os_ctrl->sco_tx_seq = bt_cb(skb)->l2cap.txseq;
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(3,5,0)
             os_ctrl->sco_tx_seq = bt_cb(skb)->control.txseq;
@@ -174,7 +174,7 @@ int rtbt_hci_dev_receive(void *bt_dev, int pkt_type, char *buf, int len)
     if (hdev)
         hdev->stat.byte_rx += len;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,13,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,13,0) || ( defined (RHEL_RELEASE_CODE) && (RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(7,3)))
     status = hci_recv_frame(hdev, skb);
 #else
     status = hci_recv_frame(skb);
@@ -339,7 +339,7 @@ int rtbt_hps_iface_init(
     hdev->close = rtbt_hci_dev_close;
     hdev->flush = rtbt_hci_dev_flush;
     hdev->send = rtbt_hci_dev_send;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,13,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,13,0) || ( defined (RHEL_RELEASE_CODE) && (RHEL_RELEASE_CODE >= RHEL_RELEASE_VERSION(7,3)))
     hdev->ioctl = rtbt_hci_dev_ioctl;
 #endif
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0)
